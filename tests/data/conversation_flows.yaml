@@ -1,0 +1,37 @@
+conversation_flows:
+  # Complete end-to-end booking flow with button clicks that auto-fill input
+  - id: complete_booking_flow_with_button_send
+    description: "Full flow: greeting -> search -> click location (sends) -> click resort (sends) -> click No (sends)"
+    turns:
+      - turn: 1
+        action: "message"
+        input: "Hello"
+        expected_answer: "Hi there! Welcome to Sun Outdoors. ☀️ How can I help you find your perfect spot in the sun today? Whether you're dreaming of a relaxing retreat, a family adventure, or just need some tips for your stay, I'm here for you!"
+        expected_intent: "greeting or welcoming user"
+        threshold: 0.65
+        
+      - turn: 2
+        action: "message"
+        input: "I'm looking for a beach campground"
+        expected_answer: "That sounds like a fantastic idea! To help you find the perfect beach campground, could you please let me know the city and state you're interested in? This will help me guide you to the best spots for your sunny getaway. ☀️"
+        expected_intent: "asking for location preferences to help find properties"
+        threshold: 0.65
+        
+      - turn: 3
+        action: "click_button"
+        button_selector: "[data-testid='Henderson, NY-button']"
+        button_text: "Henderson, NY"
+        expected_answer: "Here is the resort available at Henderson, New York. Would you like to book your stay at this resort?"
+        expected_intent: "showing resort information and asking if user wants to book"
+        threshold: 0.60
+        
+      - turn: 4
+        action: "click_button"
+        button_selector: "[data-testid='No-button']"
+        button_text: "No"
+        expected_answer: "Totally understand if you're not looking to book right now. If you'd like, I can help you explore other destinations, share more about amenities, or answer any questions you have. Is there anything else I can help you with today?"
+        expected_intent: "acknowledging declined booking and offering alternative assistance"
+        threshold: 0.65
+        
+      
+
