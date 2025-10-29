@@ -15,6 +15,17 @@ def open_chat_if_needed(page: Page) -> None:
 def send_prompt(page: Page, prompt: str) -> None:
     input_area = page.locator(settings.selectors.input_area)
     expect(input_area).to_be_visible(timeout=10000)
+    
+    # Wait for the input field to become enabled
+    page.wait_for_function(
+        """selector => {
+            const element = document.querySelector(selector);
+            return element && !element.disabled && !element.getAttribute('aria-disabled');
+        }""",
+        settings.selectors.input_area,
+        timeout=20000
+    )
+    
     input_area.fill(prompt)
     page.wait_for_timeout(500)  # Brief wait after typing
     send_button = page.locator(settings.selectors.send_button)
