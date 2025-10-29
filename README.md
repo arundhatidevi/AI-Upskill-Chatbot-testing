@@ -10,29 +10,78 @@ This README describes how to prepare a local environment, install dependencies a
 - Python 3.10+ (3.12 used in CI for this repo)
 - Git
 
-## Quick setup (recommended)
+## Setup Guide
 
-1. Open a terminal and change to the repository root (where this README lives):
+### 1. Clone the Repository
+
+First, clone this repository to your local machine:
 
 ```bash
-cd /path/to/milestone_UI_AUTOMATION(2)/milestone_UI_AUTOMATION
+# Clone the repository
+git clone https://github.com/arundhatidevi/AI-Upskill-Chatbot-testing.git
+
+# Navigate to the project directory
+cd AI-Upskill-Chatbot-testing
 ```
 
-2. Create and activate a virtual environment (we use `venv` here):
+### 2. Set Up Python Virtual Environment
+
+#### Install Python (if not already installed)
+
+- For Ubuntu/Debian:
+  ```bash
+  sudo apt update
+  sudo apt install python3.12 python3.12-venv
+  ```
+- For macOS (using Homebrew):
+  ```bash
+  brew install python@3.12
+  ```
+- For Windows:
+  - Download Python 3.12 from [python.org](https://www.python.org/downloads/)
+  - Make sure to check "Add Python to PATH" during installation
+
+#### Create and Activate Virtual Environment
+
+We use `venv` to create an isolated Python environment:
 
 ```bash
+# For Unix/macOS:
 python3 -m venv venv
-source venv/bin/activate   # Unix / macOS
-# On Windows (PowerShell): venv\Scripts\Activate.ps1
+source venv/bin/activate
+
+# For Windows (Command Prompt):
+python -m venv venv
+.\venv\Scripts\activate.bat
+
+# For Windows (PowerShell):
+python -m venv venv
+.\venv\Scripts\Activate.ps1
 ```
 
-3. Install Python dependencies:
+### 3. Install Dependencies
+
+Once your virtual environment is activated (you should see `(venv)` in your terminal prompt), install the required packages:
 
 ```bash
+# Upgrade pip to latest version
+python -m pip install --upgrade pip
+
+# Install project dependencies
 pip install -r requirements.txt
 ```
 
-4. Install Playwright browsers (required for UI tests):
+The main dependencies include:
+- pytest: Testing framework
+- playwright: Browser automation
+- pydantic: Data validation
+- python-dotenv: Environment variable management
+- allure-pytest: Test reporting
+- openai: For semantic analysis
+
+### 4. Install Playwright Browsers
+
+Playwright needs to install browser binaries for automation:
 
 ```bash
 venv/bin/playwright install
@@ -88,6 +137,35 @@ Test artifacts will be saved to the `artifacts/` directory:
 - `tests/data/*.yaml` contains test case definitions used by parametrized tests.
 
 ## Troubleshooting
+
+### Virtual Environment Issues
+
+- If `venv` creation fails:
+  ```bash
+  # Make sure python3-venv is installed
+  # On Ubuntu/Debian:
+  sudo apt install python3.12-venv
+  
+  # Try creating venv with full path to Python
+  /usr/bin/python3.12 -m venv venv
+  ```
+
+- If activation doesn't work:
+  - On Unix/macOS: Make sure you're using `source venv/bin/activate`
+  - On Windows: Try both `.\venv\Scripts\activate.bat` (CMD) and `.\venv\Scripts\Activate.ps1` (PowerShell)
+  - Check if virtualenv is installed: `python -m pip install --user virtualenv`
+
+- If pip install fails:
+  ```bash
+  # Make sure your venv is activated (you should see (venv) in prompt)
+  # Then try updating pip first:
+  python -m pip install --upgrade pip setuptools wheel
+  
+  # Then retry installing requirements
+  pip install -r requirements.txt
+  ```
+
+### Playwright Issues
 
 - Playwright/Browser not found: make sure `venv/bin/playwright install` completed successfully. Re-run it if needed.
 - `TimeoutError: Page.wait_for_selector` in tests: this usually means the page/chat widget took longer to render or the selector changed. Try:
