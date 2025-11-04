@@ -74,10 +74,11 @@ def test_response_time(page: Page, prompt: str):
         raise
 
 
-def test_concurrent_users_simulation(page: Page):
+def test_sequential_latency_and_throughput(page: Page):
    """
-   Simulate multiple rapid requests (like multiple users).
-   """
+    Measures the end-to-end latency and sequential throughput
+    for a single user submitting rapid requests.
+    """
    prompts = ["Hello"] * 5  # 5 rapid greetings
   
    page.goto(settings.base_url)
