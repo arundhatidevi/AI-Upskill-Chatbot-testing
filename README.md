@@ -91,8 +91,10 @@ venv/bin/playwright install
 
 ```text
 # .env (example)
-OPENAI_API_KEY=sk-...            # REQUIRED for semantic and intent validators
+LITE_LLM_KEY=          # REQUIRED for semantic and intent validators
+LITE_LLM_BASE_URL=
 BASE_URL=https://sunrv-chatbot.dev02cms.milestoneinternet.info/?_enablechatbot=true
+
 # Optional:
 # RECORD_VIDEO=true
 # SCREENSHOT_ON_FAILURE=true
