@@ -9,7 +9,10 @@ _client = None
 def _client_instance() -> OpenAI:
     global _client
     if _client is None:
-        _client = OpenAI(api_key=settings.openai.api_key)
+        _client = OpenAI(
+            api_key=settings.openai.api_key,
+            base_url=settings.openai.base_url
+        )
     return _client
 
 
@@ -57,4 +60,3 @@ def validate_intent(answer_text: str, intent_description: str, min_confidence: f
     thr = min_confidence if min_confidence is not None else settings.thresholds.intent_confidence_min
     result = check_intent(answer_text, intent_description)
     return (result.decision and result.confidence >= thr, result)
-
