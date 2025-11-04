@@ -33,7 +33,8 @@ class Thresholds(BaseModel):
 
 
 class OpenAIConfig(BaseModel):
-    api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
+    api_key: Optional[str] = os.getenv("LITE_LLM_KEY")
+    base_url: Optional[str] = os.getenv("LITE_LLM_BASE_URL")
     chat_model: str = os.getenv("CHAT_MODEL", "gpt-4")
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
@@ -48,7 +49,3 @@ class Settings(BaseModel):
 
 
 settings = Settings()
-
-
-
-
