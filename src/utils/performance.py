@@ -1,140 +1,123 @@
-import pytest
+"""
+Performance measurement utilities for chatbot testing.
+Contains reusable functions for measuring response times and calculating performance metrics.
+"""
 import time
 import logging
+from dataclasses import dataclass
+from typing import List, Optional
 from playwright.sync_api import Page
-from src.config import settings
-from src.extraction import open_chat_if_needed, send_prompt, read_last_bot_message
 
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.parametrize("prompt", [
-    "Hello",
-    # "I'm looking for a beach campground",
-    # "Tell me about Henderson, NY",
-    # "What amenities do you offer?",
-    # "I want to book a resort"
-])
-def test_response_time(page: Page, prompt: str):
+@dataclass
+class PerformanceMetrics:
+    """Container for performance measurement results."""
+    response_times: List[float]
+    total_time: float
+    successful_requests: int
+    total_requests: int
+    
+    @property
+    def throughput(self) -> float:
+        """Calculate requests per second."""
+        if self.total_time == 0:
+            return 0.0
+        return self.total_requests / self.total_time
+    
+    @property
+    def avg_response_time(self) -> Optional[float]:
+        """Calculate average response time."""
+        if not self.response_times:
+            return None
+        return sum(self.response_times) / len(self.response_times)
+    
+    @property
+    def max_response_time(self) -> Optional[float]:
+        """Get maximum response time."""
+        if not self.response_times:
+            return None
+        return max(self.response_times)
+    
+    @property
+    def min_response_time(self) -> Optional[float]:
+        """Get minimum response time."""
+        if not self.response_times:
+            return None
+        return min(self.response_times)
+    
+    @property
+    def success_rate(self) -> float:
+        """Calculate success rate as percentage."""
+        if self.total_requests == 0:
+            return 0.0
+        return (self.successful_requests / self.total_requests) * 100
+    
+    def log_summary(self) -> None:
+        """Log a formatted summary of performance metrics."""
+        logger.info(f"\n📊 Performance Metrics:")
+        logger.info(f"  Total requests: {self.total_requests}")
+        logger.info(f"  Successful: {self.successful_requests}")
+        logger.info(f"  Success rate: {self.success_rate:.1f}%")
+        logger.info(f"  Total time: {self.total_time:.2f}s")
+        logger.info(f"  Throughput: {self.throughput:.2f} requests/sec")
+        
+        if self.response_times:
+            logger.info(f"  Avg response time: {self.avg_response_time:.2f}s")
+            logger.info(f"  Max response time: {self.max_response_time:.2f}s")
+            logger.info(f"  Min response time: {self.min_response_time:.2f}s")
+
+
+def measure_response_time(
+    page: Page,
+    messages_before: int,
+    timeout: int = 10000
+) -> Optional[float]:
     """
-    Test chatbot response time for various prompts.
-    Performance target: < 5 seconds for response
+    Measure the time taken for a new message to appear after sending a prompt.
+    
+    Args:
+        page: Playwright page object
+        messages_before: Count of messages before sending the prompt
+        timeout: Maximum time to wait for response (milliseconds)
+    
+    Returns:
+        Response time in seconds, or None if timeout/error occurred
     """
-    logger.info(f"Testing response time for prompt: {prompt}")
-    
-    # Navigate and open chat
-    page.goto(settings.base_url)
-    page.wait_for_load_state("networkidle")
-    open_chat_if_needed(page)
-    
-    # Skip reset to avoid modal blocking issues (same approach as other tests)
-    logger.info("Using existing conversation state (skipping reset to avoid modal blocking)")
-    
-    # Wait for welcome message and buttons
-    page.wait_for_selector(".mimir-chip-button", timeout=5000)
-    page.wait_for_timeout(1000)
-    
-    # Count messages before
-    messages_before = page.locator(".mimir-chat-message").count()
-    
-    # Send prompt and measure bot response time
     start_time = time.time()
-    send_prompt(page, prompt)
-    
-    # Wait for bot's response to appear in UI (measures response time + render time)
-    # For accurate response time measurement, we wait for the message to appear
     try:
         page.wait_for_function(
             f"document.querySelectorAll('.mimir-chat-message').length > {messages_before}",
-            timeout=10000
+            timeout=timeout
         )
-        end_time = time.time()
-        response_time = end_time - start_time
-        
-        # Read response
-        response = read_last_bot_message(page)
-        
-        logger.info(f"Response time: {response_time:.2f}s")
-        logger.info(f"Response: {response[:100]}...")
-        
-        # Performance assertions
-        assert response_time < 5.0, (
-            f"Response too slow!\n"
-            f"Prompt: {prompt}\n"
-            f"Response time: {response_time:.2f}s\n"
-            f"Expected: < 5.0s"
-        )
-        
-        logger.info(f"✅ PASSED - Response time: {response_time:.2f}s < 5.0s")
-        
+        elapsed = time.time() - start_time
+        return elapsed
     except Exception as e:
-        end_time = time.time()
-        response_time = end_time - start_time
-        logger.error(f"❌ FAILED - Timeout or error after {response_time:.2f}s: {e}")
-        raise
+        elapsed = time.time() - start_time
+        logger.warning(f"Response measurement timed out after {elapsed:.2f}s: {e}")
+        return None
 
 
-def test_concurrent_users_simulation(page: Page):
-   """
-   Simulate multiple rapid requests (like multiple users).
-   """
-   prompts = ["Hello"] * 5  # 5 rapid greetings
-  
-   page.goto(settings.base_url)
-   page.wait_for_load_state("networkidle")
-   open_chat_if_needed(page)
-  
-   response_times = []
-   start_overall = time.time()
-  
-   for i, prompt in enumerate(prompts):
-       logger.info(f"Request {i+1}/{len(prompts)}")
-      
-       messages_before = page.locator(".mimir-chat-message").count()
-      
-       start = time.time()
-       send_prompt(page, prompt)
-      
-       try:
-           page.wait_for_function(
-               f"document.querySelectorAll('.mimir-chat-message').length > {messages_before}",
-               timeout=10000
-           )
-           elapsed = time.time() - start
-           response_times.append(elapsed)
-           logger.info(f"  Request {i+1} completed in {elapsed:.2f}s")
-       except:
-           logger.warning(f"  Request {i+1} timed out")
-  
-   total_time = time.time() - start_overall
-  
-   logger.info(f"\n📊 Load Test Results:")
-   logger.info(f"  Total requests: {len(prompts)}")
-   logger.info(f"  Successful: {len(response_times)}")
-   logger.info(f"  Total time: {total_time:.2f}s")
-   throughput = len(prompts) / total_time
-   logger.info(f"  Throughput: {throughput:.2f} requests/sec")
-   
-   # Calculate average and max response times
-   if response_times:
-       avg_time = sum(response_times) / len(response_times)
-       max_time = max(response_times)
-       logger.info(f"  Avg per request: {avg_time:.2f}s")
-       logger.info(f"  Max response time: {max_time:.2f}s")
-       
-       # Parameter 1: Each request must complete within 5 seconds (SLA)
-       assert max_time < 5.0, (
-           f"❌ SLA Violation - Max response time {max_time:.2f}s exceeds 5s threshold"
-       )
-       logger.info(f"  ✅ SLA Check: Max response time {max_time:.2f}s < 5.0s")
-   else:
-       raise AssertionError("❌ FAILED - No successful requests")
-  
-   # Parameter 2: Total test time must complete within 30 seconds (throughput)
-   assert total_time < 30.0, (
-       f"❌ Throughput Violation - Total time {total_time:.2f}s exceeds 30s threshold"
-   )
-   logger.info(f"  ✅ Throughput Check: Total time {total_time:.2f}s < 30.0s")
-  
-   assert len(response_times) == len(prompts), "Some requests failed"
-   logger.info(f"✅ PASSED - All requests completed within SLA and throughput limits")
+def calculate_metrics(
+    response_times: List[float],
+    total_time: float,
+    total_requests: int
+) -> PerformanceMetrics:
+    """
+    Calculate performance metrics from response time data.
+    
+    Args:
+        response_times: List of individual response times in seconds
+        total_time: Total elapsed time for all requests in seconds
+        total_requests: Total number of requests attempted
+    
+    Returns:
+        PerformanceMetrics object with calculated metrics
+    """
+    return PerformanceMetrics(
+        response_times=response_times,
+        total_time=total_time,
+        successful_requests=len(response_times),
+        total_requests=total_requests
+    )
