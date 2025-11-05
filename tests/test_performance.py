@@ -4,6 +4,7 @@ import logging
 from playwright.sync_api import Page
 from src.config import settings
 from src.extraction import open_chat_if_needed, send_prompt, read_last_bot_message
+from src.utils.performance import measure_response_time, calculate_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -41,37 +42,31 @@ def test_response_time(page: Page, prompt: str):
     start_time = time.time()
     send_prompt(page, prompt)
     
-    # Wait for bot's response to appear in UI (measures response time + render time)
-    # For accurate response time measurement, we wait for the message to appear
-    try:
-        page.wait_for_function(
-            f"document.querySelectorAll('.mimir-chat-message').length > {messages_before}",
-            timeout=10000
-        )
+    # Measure response time using utility function
+    response_time = measure_response_time(page, messages_before, timeout=10000)
+    
+    if response_time is None:
+        # Timeout occurred
         end_time = time.time()
         response_time = end_time - start_time
-        
-        # Read response
-        response = read_last_bot_message(page)
-        
-        logger.info(f"Response time: {response_time:.2f}s")
-        logger.info(f"Response: {response[:100]}...")
-        
-        # Performance assertions
-        assert response_time < 5.0, (
-            f"Response too slow!\n"
-            f"Prompt: {prompt}\n"
-            f"Response time: {response_time:.2f}s\n"
-            f"Expected: < 5.0s"
-        )
-        
-        logger.info(f"✅ PASSED - Response time: {response_time:.2f}s < 5.0s")
-        
-    except Exception as e:
-        end_time = time.time()
-        response_time = end_time - start_time
-        logger.error(f"❌ FAILED - Timeout or error after {response_time:.2f}s: {e}")
-        raise
+        logger.error(f"❌ FAILED - Timeout after {response_time:.2f}s")
+        raise AssertionError(f"Response timeout after {response_time:.2f}s")
+    
+    # Read response
+    response = read_last_bot_message(page)
+    
+    logger.info(f"Response time: {response_time:.2f}s")
+    logger.info(f"Response: {response[:100]}...")
+    
+    # Performance assertions
+    assert response_time < 5.0, (
+        f"Response too slow!\n"
+        f"Prompt: {prompt}\n"
+        f"Response time: {response_time:.2f}s\n"
+        f"Expected: < 5.0s"
+    )
+    
+    logger.info(f"✅ PASSED - Response time: {response_time:.2f}s < 5.0s")
 
 
 def test_sequential_latency_and_throughput(page: Page):
@@ -93,41 +88,29 @@ def test_sequential_latency_and_throughput(page: Page):
       
        messages_before = page.locator(".mimir-chat-message").count()
       
-       start = time.time()
        send_prompt(page, prompt)
       
-       try:
-           page.wait_for_function(
-               f"document.querySelectorAll('.mimir-chat-message').length > {messages_before}",
-               timeout=10000
-           )
-           elapsed = time.time() - start
+       # Use utility function to measure response time
+       elapsed = measure_response_time(page, messages_before, timeout=10000)
+      
+       if elapsed is not None:
            response_times.append(elapsed)
            logger.info(f"  Request {i+1} completed in {elapsed:.2f}s")
-       except:
+       else:
            logger.warning(f"  Request {i+1} timed out")
   
    total_time = time.time() - start_overall
   
-   logger.info(f"\n📊 Load Test Results:")
-   logger.info(f"  Total requests: {len(prompts)}")
-   logger.info(f"  Successful: {len(response_times)}")
-   logger.info(f"  Total time: {total_time:.2f}s")
-   throughput = len(prompts) / total_time
-   logger.info(f"  Throughput: {throughput:.2f} requests/sec")
+   # Calculate metrics using utility function
+   metrics = calculate_metrics(response_times, total_time, len(prompts))
+   metrics.log_summary()
    
-   # Calculate average and max response times
-   if response_times:
-       avg_time = sum(response_times) / len(response_times)
-       max_time = max(response_times)
-       logger.info(f"  Avg per request: {avg_time:.2f}s")
-       logger.info(f"  Max response time: {max_time:.2f}s")
-       
-       # Parameter 1: Each request must complete within 5 seconds (SLA)
-       assert max_time < 5.0, (
-           f"❌ SLA Violation - Max response time {max_time:.2f}s exceeds 5s threshold"
+   # Parameter 1: Each request must complete within 5 seconds (SLA)
+   if metrics.response_times:
+       assert metrics.max_response_time < 5.0, (
+           f"❌ SLA Violation - Max response time {metrics.max_response_time:.2f}s exceeds 5s threshold"
        )
-       logger.info(f"  ✅ SLA Check: Max response time {max_time:.2f}s < 5.0s")
+       logger.info(f"  ✅ SLA Check: Max response time {metrics.max_response_time:.2f}s < 5.0s")
    else:
        raise AssertionError("❌ FAILED - No successful requests")
   
